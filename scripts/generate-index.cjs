@@ -57,6 +57,26 @@ function main() {
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(path.join(outDir, 'index.html'), indexHtml, 'utf8');
     console.log('Generated dist/client/index.html ->', clientEntry);
+
+    // Ensure a server shim exists at dist/server/server.js pointing to the
+    // actual server bundle (some build outputs name it `index.js`). This
+    // prevents preview/deploy plugins from failing when they expect
+    // `dist/server/server.js` to exist.
+    try {
+        const serverDir = path.join(__dirname, '..', 'dist', 'server');
+        if (fs.existsSync(serverDir)) {
+            const candidate = path.join(serverDir, 'index.js');
+            const shimPath = path.join(serverDir, 'server.js');
+            if (fs.existsSync(candidate) && !fs.existsSync(shimPath)) {
+                const shim = `import s from './index.js';\nexport default s;\n`;
+                fs.writeFileSync(shimPath, shim, 'utf8');
+                console.log('Wrote server shim at', shimPath);
+            }
+        }
+    } catch (err) {
+        // Non-fatal — index generation succeeded regardless
+        console.error('Failed to write server shim:', err && err.message);
+    }
 }
 
 main();
