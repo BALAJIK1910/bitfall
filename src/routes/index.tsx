@@ -46,8 +46,7 @@ function MatrixRain() {
 
     // Secret rows: each ASCII char (8 bits) gets its own horizontal row,
     // bits placed left -> right across the screen.
-    // Recomputed on resize.
-    type SecretCell = { x: number; y: number; bit: string; idx: number };
+    type SecretCell = { x: number; y: number; bit: string; idx: number; globalIdx: number };
     let secretCells: SecretCell[] = [];
 
     const mouse = { x: -9999, y: -9999 };
@@ -71,8 +70,6 @@ function MatrixRain() {
       }));
 
       // Lay out 5 chars × 8 bits across 5 rows.
-      // Rows are evenly distributed in the middle 70% of the viewport,
-      // snapped to the rain grid so bits align with falling columns.
       secretCells = [];
       const charCount = SECRET.length; // 5
       const bitsPerChar = 8;
@@ -80,24 +77,22 @@ function MatrixRain() {
       const bottomPct = 0.85;
       const usableH = height * (bottomPct - topPct);
       const rowStep = usableH / (charCount - 1 || 1);
-      // Spread 8 bits across the width with margins
       const sideMargin = Math.min(width * 0.1, 80);
       const usableW = width - sideMargin * 2;
       const colStep = usableW / (bitsPerChar - 1);
 
       for (let c = 0; c < charCount; c++) {
         const yPx = height * topPct + rowStep * c;
-        // snap y to font grid
         const ySnap = Math.round(yPx / fontSize) * fontSize;
         for (let b = 0; b < bitsPerChar; b++) {
           const xPx = sideMargin + colStep * b;
-          // snap x to column grid
           const xSnap = Math.round(xPx / fontSize) * fontSize;
           secretCells.push({
             x: xSnap,
             y: ySnap,
             bit: SECRET_BITS[c * bitsPerChar + b],
             idx: b,
+            globalIdx: c * bitsPerChar + b,
           });
         }
       }
@@ -164,31 +159,23 @@ function MatrixRain() {
         }
       }
 
-      // ---- Hidden secret bits on fixed rows, drawn last so they sit on top ----
-      // They render in the SAME green as the rain so they blend in.
-      // When the cursor is within REVEAL_RADIUS, that cell turns RED.
+      // ---- Hidden secret bits on fixed rows ----
       for (const cell of secretCells) {
         const dx = cell.x - mouse.x;
         const dy = cell.y - mouse.y;
         const dist = Math.hypot(dx, dy);
         const hovered = dist < REVEAL_RADIUS;
 
-        // Clear the cell area so the rain underneath doesn't muddy it
-        ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-        ctx.fillRect(cell.x - 2, cell.y - fontSize + 2, fontSize + 2, fontSize);
-
         if (hovered) {
-          // Glow halo
+          // Clear the cell area so the rain underneath doesn't muddy it
+          ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+          ctx.fillRect(cell.x - 2, cell.y - fontSize + 2, fontSize + 2, fontSize);
+
+          // Glow halo for manual hover (Red)
           ctx.fillStyle = "rgba(255, 60, 60, 0.25)";
           ctx.fillText(cell.bit, cell.x - 1, cell.y);
           ctx.fillText(cell.bit, cell.x + 1, cell.y);
           ctx.fillStyle = "rgba(255, 80, 80, 1)";
-          ctx.fillText(cell.bit, cell.x, cell.y);
-        } else {
-          // Blend with rain: same green, head-bright
-          ctx.fillStyle = "rgba(220, 255, 220, 0.9)";
-          ctx.fillText(cell.bit, cell.x, cell.y);
-          ctx.fillStyle = "rgba(74, 222, 128, 0.95)";
           ctx.fillText(cell.bit, cell.x, cell.y);
         }
       }
@@ -196,8 +183,6 @@ function MatrixRain() {
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
-
-
 
     return () => {
       cancelAnimationFrame(raf);
